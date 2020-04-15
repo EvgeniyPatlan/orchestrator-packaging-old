@@ -88,6 +88,7 @@ get_sources(){
     echo "VERSION=${VERSION}" >> orchestrator.properties
     echo "BUILD_NUMBER=${BUILD_NUMBER}" >> orchestrator.properties
     echo "BUILD_ID=${BUILD_ID}" >> orchestrator.properties
+    git clone https://github.com/EvgeniyPatlan/orchestrator-packaging.git
     git clone "$REPO" ${PRODUCT_FULL}
     retval=$?
     if [ $retval != 0 ]
@@ -106,11 +107,10 @@ get_sources(){
     echo "REVISION=${REVISION}" >> ${WORKDIR}/orchestrator.properties
     rm -fr debian rpm
     mkdir rpm
-    mkdir debian
     cd rpm
-    wget https://raw.githubusercontent.com/EvgeniyPatlan/orchestrator-packaging/master/percona-orchestrator.spec
+    cp ${WORKDIR}/orchestrator-packaging/percona-orchestrator.spec ./
     cd ../
-    #TODO debs
+    mv ${WORKDIR}/orchestrator-packaging/debian ./
     ver=$(git rev-parse HEAD)
     description=$(git describe --tags --always --dirty)
     sed -i "s:\$(git rev-parse HEAD):\"$ver\":" script/build
@@ -140,7 +140,13 @@ get_system(){
     fi
     return
 }
-
+install_go() {
+    wget https://dl.google.com/go/go1.13.1.linux-amd64.tar.gz
+    rm -rf /usr/local/go
+    tar -C /usr/local -xzf go1.13.1.linux-amd64.tar.gz
+    update-alternatives --install /usr/bin/go go /usr/local/go/bin/go 1
+    update-alternatives --set go /usr/local/go/bin/go
+}
 install_deps() {
     if [ $INSTALL = 0 ]
     then
@@ -160,30 +166,14 @@ install_deps() {
         RHEL=$(rpm --eval %rhel)
         INSTALL_LIST="git wget rpm-build gcc make perl-Digest-SHA tar rsync"
         yum -y install ${INSTALL_LIST}
-        wget https://dl.google.com/go/go1.13.1.linux-amd64.tar.gz
-        rm -rf /usr/local/go
-        tar -C /usr/local -xzf go1.13.1.linux-amd64.tar.gz
-        update-alternatives --install /usr/bin/go go /usr/local/go/bin/go 1
-        update-alternatives --set go /usr/local/go/bin/go
+        install_go
     else
       export DEBIAN=$(lsb_release -sc)
       export ARCH=$(echo $(uname -m) | sed -e 's:i686:i386:g')
       apt-get update || true
-      if [ "x${DEBIAN}" != "xfocal" ]; then
-        INSTALL_LIST="build-essential debconf debhelper clang-10 devscripts dh-exec dh-systemd git wget build-essential fakeroot devscripts python3-psycopg2 python-setuptools python-dev libyaml-dev python3-virtualenv dh-virtualenv python3-psycopg2 wget git ruby ruby-dev rubygems build-essential curl golang dh-python libjs-mathjax pyflakes3 python3-boto python3-dateutil python3-dnspython python3-etcd  python3-flake8 python3-kazoo python3-mccabe python3-mock python3-prettytable python3-psutil python3-pycodestyle python3-pytest python3-pytest-cov python3-setuptools python3-sphinx python3-sphinx-rtd-theme python3-tz python3-tzlocal sphinx-common python3-click"
-      else
-        INSTALL_LIST="build-essential debconf debhelper clang-10 devscripts dh-exec dh-systemd git wget build-essential fakeroot devscripts python3-psycopg2 python2-dev libyaml-dev python3-virtualenv python3-psycopg2 wget git ruby ruby-dev rubygems build-essential curl golang dh-python libjs-mathjax pyflakes3 python3-boto python3-dateutil python3-dnspython python3-etcd  python3-flake8 python3-kazoo python3-mccabe python3-mock python3-prettytable python3-psutil python3-pycodestyle python3-pytest python3-pytest-cov python3-setuptools python3-sphinx python3-sphinx-rtd-theme python3-tz python3-tzlocal sphinx-common python3-click"
-      fi
+      INSTALL_LIST="curl rsync build-essential dpkg-dev git tar make gcc g++ debconf debhelper devscripts dh-exec dh-systemd"
       DEBIAN_FRONTEND=noninteractive apt-get -y install ${INSTALL_LIST}
-      if [ "x${DEBIAN}" = "xfocal" ]; then
-        wget https://bootstrap.pypa.io/get-pip.py
-        python2.7 get-pip.py
-        rm -rf /usr/bin/python2
-        ln -s /usr/bin/python2.7 /usr/bin/python2
-        wget https://jenkins.percona.com/downloads/dh-virtualenv_1.0-1_all.deb
-        DEBIAN_FRONTEND=noninteractive apt-get -y install ./dh-virtualenv_1.0-1_all.deb
-        rm -f dh-virtualenv_1.0-1_all.deb
-      fi
+      install_go
     fi
     return;
 }
@@ -323,7 +313,7 @@ build_source_deb(){
     fi
     rm -rf percona-orchestrator*
     get_tar "source_tarball"
-    rm -f *.dsc *.orig.tar.gz *.debian.tar.gz *.changes
+    rm -f *.dsc *.orig.tar.gz *.diff.gz *.changes
     #
     TARFILE=$(basename $(find . -name 'percona-orchestrator*.tar.gz' | sort | tail -n1))
     DEBIAN=$(lsb_release -sc)
@@ -348,10 +338,11 @@ build_source_deb(){
     cd ../
     mkdir -p $WORKDIR/source_deb
     mkdir -p $CURDIR/source_deb
-    cp *.debian.tar.* $WORKDIR/source_deb
+    cp *.diff.gz $WORKDIR/source_deb
     cp *_source.changes $WORKDIR/source_deb
     cp *.dsc $WORKDIR/source_deb
     cp *.orig.tar.gz $WORKDIR/source_deb
+    cp *.diff.gz $CURDIR/source_deb
     cp *.debian.tar.* $CURDIR/source_deb
     cp *_source.changes $CURDIR/source_deb
     cp *.dsc $CURDIR/source_deb
@@ -369,7 +360,7 @@ build_deb(){
         echo "It is not possible to build source deb here"
         exit 1
     fi
-    for file in 'dsc' 'orig.tar.gz' 'changes' 'debian.tar*'
+    for file in 'dsc' 'orig.tar.gz' 'changes' 'diff.gz*'
     do
         get_deb_sources $file
     done
@@ -381,17 +372,14 @@ build_deb(){
     #
     echo "DEBIAN=${DEBIAN}" >> orchestrator.properties
     echo "ARCH=${ARCH}" >> orchestrator.properties
-
     #
     DSC=$(basename $(find . -name '*.dsc' | sort | tail -n1))
     #
     dpkg-source -x ${DSC}
     #
     cd ${PRODUCT}-${VERSION}
-    cp debian/patches/add-sample-config.patch ./orchestrator.yml.sample
-    sed -i 's:ExecStart=/bin/orchestrator /etc/orchestrator.yml:ExecStart=/opt/orchestrator/bin/orchestrator /etc/orchestrator/orchestrator.yml:' extras/startup-scripts/orchestrator.service
-    dch -m -D "${DEBIAN}" --force-distribution -v "1:${VERSION}-${RELEASE}.${DEBIAN}" 'Update distribution'
-    unset $(locale|cut -d= -f1)
+    #upstream set Epoch: 1 so we need to increase epoch
+    dch -m -D "${DEBIAN}" --force-distribution -v "2:${VERSION}-${RELEASE}.${DEBIAN}" 'Update distribution'
     dpkg-buildpackage -rfakeroot -us -uc -b
     mkdir -p $CURDIR/deb
     mkdir -p $WORKDIR/deb
