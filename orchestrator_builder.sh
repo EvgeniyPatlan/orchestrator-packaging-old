@@ -404,12 +404,12 @@ INSTALL=0
 RPM_RELEASE=1
 DEB_RELEASE=1
 REVISION=0
-BRANCH="v3.2.3"
+BRANCH="v3.2.4"
 REPO="https://github.com/openark/orchestrator.git"
 PRODUCT=percona-orchestrator
 DEBUG=0
 parse_arguments PICK-ARGS-FROM-ARGV "$@"
-VERSION='3.2.3'
+VERSION='3.2.4'
 RELEASE='1'
 PRODUCT_FULL=${PRODUCT}-${VERSION}-${RELEASE}
 
