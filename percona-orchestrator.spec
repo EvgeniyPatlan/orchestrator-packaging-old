@@ -2,7 +2,7 @@
 
 Name:           percona-orchestrator
 Version:        %{version}
-Release:        2%{?dist}
+Release:        1%{?dist}
 Summary:        MySQL replication topology management and HA
 
 Group:          Applications/Databases

@@ -89,6 +89,7 @@ get_sources(){
     echo "BUILD_NUMBER=${BUILD_NUMBER}" >> orchestrator.properties
     echo "BUILD_ID=${BUILD_ID}" >> orchestrator.properties
     git clone https://github.com/EvgeniyPatlan/orchestrator-packaging.git
+    sed -i -e "s/Release:        [1-9]/Release:        ${RELEASE}/g" ${WORKDIR}/orchestrator-packaging/percona-orchestrator.spec
     git clone "$REPO" ${PRODUCT_FULL}
     retval=$?
     if [ $retval != 0 ]
