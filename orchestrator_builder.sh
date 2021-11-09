@@ -107,6 +107,7 @@ get_sources(){
     echo "REVISION=${REVISION}" >> ${WORKDIR}/orchestrator.properties
     wget https://raw.githubusercontent.com/adivinho/orchestrator-packaging/DISTMYSQL-133-Apply-the-patch-for-orchestrator-3.2.6/29591_orc-8026.patch
     git apply 29591_orc-8026.patch
+    git diff
     rm -f 29591_orc-8026.patch
     rm -fr debian rpm
     mkdir rpm
