@@ -415,7 +415,7 @@ PRODUCT=percona-orchestrator
 DEBUG=0
 parse_arguments PICK-ARGS-FROM-ARGV "$@"
 VERSION='3.2.6'
-RELEASE='2'
+RELEASE='1'
 PRODUCT_FULL=${PRODUCT}-${VERSION}-${RELEASE}
 
 check_workdir
